@@ -1,16 +1,26 @@
 package com.yupi.aiagentbackend.app;
 
+import com.yupi.aiagentbackend.advisor.MyLoggerAdvisor;
+import com.yupi.aiagentbackend.advisor.ReReadingAdvisor;
+import com.yupi.aiagentbackend.chatmemory.FileBasedChatMemory;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 
 /**
@@ -36,16 +46,21 @@ public class LoveApp {
      * @param dashscopeChatModel
      */
     public LoveApp(ChatModel dashscopeChatModel) {
+        //初始化基于文件的会话记忆
+        String fileDir=System.getProperty("user.dir")+"/tmp/chatMemory";
+        FileBasedChatMemory chatMemory = new FileBasedChatMemory(fileDir);
         // 初始化基于内存的对话记忆（窗口大小10条）
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
-                .chatMemoryRepository(new InMemoryChatMemoryRepository())
-                .maxMessages(10)
-                .build();
+//        ChatMemory chatMemory = MessageWindowChatMemory.builder(fileDir)
+//                .chatMemoryRepository(new InMemoryChatMemoryRepository())
+//                .maxMessages(10)
+//                .build();
         chatClient = ChatClient.builder(dashscopeChatModel)
                 .defaultSystem(SYSTEM_PROMPT)
                 .defaultAdvisors(
                      MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                     new SimpleLoggerAdvisor()
+                     //自定义拦截器Advisor
+                     new MyLoggerAdvisor()
+                        //new ReReadingAdvisor()
                 )
                 .build();
     }
@@ -66,6 +81,69 @@ public class LoveApp {
         String content = response.getResult().getOutput().getText();
         log.info("content: {}", content);
         return content;
-
     }
+
+    record LoveReport(String title, List<String> suggestions) {
+    }
+
+    /**
+     * AI恋爱报告功能（实战结构化输出）
+     * @param message
+     * @param chatId
+     * @return
+     */
+    public LoveReport doChatWithReport(String message, String chatId) {
+        LoveReport loveReport = chatClient
+                .prompt()
+                .system(SYSTEM_PROMPT + "每次对话后都要生成恋爱结果，标题为{用户名}的恋爱报告，内容为建议列表")
+                .user(message)
+                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+                .call()
+                .entity(LoveReport.class);
+        log.info("loveReport: {}", loveReport);
+        return loveReport;
+    }
+    //AI恋爱知识库问答功能
+    @Resource
+    private VectorStore loveAppVectorStore;
+
+    @Resource
+    private Advisor loveAppRagCloudAdvisor;
+
+    @Resource
+    private VectorStore pgVectorVectorStore;
+    /**
+     * 和RAG知识库进行对话
+     * @param message
+     * @param chatId
+     * @return
+     */
+    public String doChatWithRag(String message, String chatId) {
+        ChatResponse response = chatClient
+                .prompt()
+                .user(message)
+                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+                //开启日志，便于观察效果
+                .advisors(new MyLoggerAdvisor())
+//                //应用RAG知识库问答
+//                .advisors(RetrievalAugmentationAdvisor.builder()
+//                        .documentRetriever(VectorStoreDocumentRetriever.builder()
+//                                .vectorStore(loveAppVectorStore)
+//                                .build())
+//                        .build())
+                /*应用RAG检索增强服务(基于云知识库服务)
+                .advisors(loveAppRagCloudAdvisor)*/
+                //应用RAG检索增强服务（基于PGVectorStore向量存储）
+                .advisors(RetrievalAugmentationAdvisor.builder()
+                        .documentRetriever(VectorStoreDocumentRetriever.builder()
+                                .vectorStore(pgVectorVectorStore)  // 用你注入的 PgVector 向量库
+                                .build())
+                        .build())
+                .call()
+                .chatResponse();
+        String content = response.getResult().getOutput().getText();
+        log.info("content: {}", content);
+        return content;
+    }
+
 }

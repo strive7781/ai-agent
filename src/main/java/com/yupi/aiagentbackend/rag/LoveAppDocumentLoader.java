@@ -19,6 +19,7 @@ import java.util.List;
  * @Date 2026/6/14 15:06 周日
  * @since 1.0
  **/
+
 @Component
 @Slf4j
 public class LoveAppDocumentLoader {
@@ -29,22 +30,28 @@ public class LoveAppDocumentLoader {
         this.resolver = resolver;
     }
 
-    /**
+/**
      * 加载所有markdown资源
+     * @return
+     */
+
+    /**
+     * 加载多篇markdown文件
      * @return
      */
     public List<Document> loadMarkdownDocuments() {
         List<Document> allDocuments=new ArrayList<>();
-        //加载多篇markdown文件
         try {
             Resource[] resources = resolver.getResources("classpath:documents/*.md");
             for (Resource resource : resources) {
                 String fileName = resource.getFilename();
+                String status = fileName.substring(fileName.length() - 6, fileName.length() - 4);
                 MarkdownDocumentReaderConfig config = MarkdownDocumentReaderConfig.builder()
                         .withHorizontalRuleCreateDocument(true)
                         .withIncludeCodeBlock(false)
                         .withIncludeBlockquote(false)
                         .withAdditionalMetadata("filename", fileName)
+                        .withAdditionalMetadata("status",status)
                         .build();
                 MarkdownDocumentReader markdownDocumentReader = new MarkdownDocumentReader(resource, config);
                 allDocuments.addAll(markdownDocumentReader.get());
@@ -56,3 +63,4 @@ public class LoveAppDocumentLoader {
     return allDocuments;
     }
 }
+

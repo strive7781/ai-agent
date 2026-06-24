@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @Date 2026/6/14 15:20 周日
  * @since 1.0
  **/
+
 @SpringBootTest
 class LoveAppDocumentLoaderTest {
     @Resource

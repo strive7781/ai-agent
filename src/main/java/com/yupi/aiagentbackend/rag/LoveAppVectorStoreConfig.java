@@ -3,6 +3,7 @@ package com.yupi.aiagentbackend.rag;
 import jakarta.annotation.Resource;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
@@ -23,11 +24,19 @@ public class LoveAppVectorStoreConfig {
     @Resource
     private LoveAppDocumentLoader loveAppDocumentLoader;
 
+    @Resource
+    private MyTokenTextSplitter myTokenTextSplitter;
+
+    @Resource
+    private MyKeywordEnricher myKeywordEnricher;
+
     @Bean
     VectorStore loveAppVectorStore(EmbeddingModel embeddingModel) {
         SimpleVectorStore simpleVectorStore = SimpleVectorStore.builder(embeddingModel).build();
         List<Document> documentsList = loveAppDocumentLoader.loadMarkdownDocuments();
-        simpleVectorStore.add(documentsList);
+        List<Document> enrichDocuments = myKeywordEnricher.enrichDocuments(documentsList);
+        //List<Document> spiltDocuments = myTokenTextSplitter.splitCustomized(documentsList);
+        simpleVectorStore.add(enrichDocuments);
         return simpleVectorStore;
     }
 
