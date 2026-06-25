@@ -1,8 +1,6 @@
-### CUSTOM###
-application-local.yml
-mcp-servers.json
-tmp
 HELP.md
+application-sse.yml
+application-stdio.yml
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
